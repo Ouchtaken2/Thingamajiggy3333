@@ -29,10 +29,10 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: "Frickbear's 3"
-        CFBundleName: "Frickbears3iOS"
+        CFBundleDisplayName: "Frickbear's 3 4LD"
+        CFBundleName: "Frickbears3-4LD"
         CFBundleIdentifier: "com.fanport.frickbears3"
-        CFBundleShortVersionString: "1.0"
+        CFBundleShortVersionString: "2.1.5"
         CFBundleVersion: "1"
         UILaunchScreen: {}
         LSRequiresIPhoneOS: true

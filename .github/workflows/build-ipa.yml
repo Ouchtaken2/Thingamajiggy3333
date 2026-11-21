@@ -1,4 +1,4 @@
-name: Build Frickbears3 iOS IPA
+name: Build Frickbear's 3 4LD iOS IPA
 
 on:
   workflow_dispatch:
@@ -10,8 +10,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download game web build
-        run: bash Scripts/fetch-web-build.sh
+      # Game/index.html is the pinned 4LD 2.1.5 loader committed to this repo.
+      # It pulls the runtime/assets from jsDelivr at runtime, so there is no
+      # giant download or asset-bundling step here.
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -41,11 +42,9 @@ jobs:
           mkdir -p Payload/Frickbears3iOS.app/Game
           cp -R Game/. Payload/Frickbears3iOS.app/Game/
 
-          # Fail loudly if the assets did not make it in, instead of shipping
-          # a useless 96 KB IPA.
+          # Fail loudly if the loader did not make it in.
           test -f Payload/Frickbears3iOS.app/Game/index.html
-          test -f Payload/Frickbears3iOS.app/Game/runner.wasm
-          test -f Payload/Frickbears3iOS.app/Game/runner.data
+          grep -q "FOUR LAYERS DOWN" Payload/Frickbears3iOS.app/Game/index.html
 
           du -sh Payload/Frickbears3iOS.app/Game
           zip -qry Frickbears3iOS.ipa Payload
@@ -54,6 +53,6 @@ jobs:
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Frickbears3iOS-IPA
+          name: Frickbears3-4LD-IPA
           path: Frickbears3iOS.ipa
           if-no-files-found: error

@@ -89,6 +89,13 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         // Always-on helpers injected before the page scripts run.
         let userContent = config.userContentController
         userContent.add(self, name: Self.statsHandler)
+        // The bundled 4LD loader has its own click-to-start overlay and tries
+        // to use the Fullscreen API. Neither applies inside a native app.
+        userContent.addUserScript(WKUserScript(
+            source: "window.__FB3_EMBED = true;",
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         userContent.addUserScript(WebBridge.speedScript(initialSpeed: self.config.gameSpeed))
         userContent.addUserScript(WebBridge.statsScript())
 
@@ -199,21 +206,21 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         container.backgroundColor = UIColor(red: 6/255, green: 6/255, blue: 18/255, alpha: 1)
 
         let title = UILabel()
-        title.text = "Five Nights at\nFrickbear's 3"
+        title.text = "Frickbear's 3\nFour Layers Down 2.1.5"
         title.textColor = .white
-        title.font = .boldSystemFont(ofSize: 34)
+        title.font = .boldSystemFont(ofSize: 32)
         title.textAlignment = .center
         title.numberOfLines = 0
 
         let subtitle = UILabel()
-        subtitle.text = "Unofficial iOS port • Fan-made • Play in landscape"
+        subtitle.text = "Unofficial iOS wrapper • Fan-made • Landscape\nInternet required on first launch (several hundred MB)"
         subtitle.textColor = UIColor(white: 0.75, alpha: 1)
         subtitle.font = .systemFont(ofSize: 13)
         subtitle.textAlignment = .center
         subtitle.numberOfLines = 0
 
         let note = UILabel()
-        note.text = "Personal use only. Original game by SpookyRick.\nSee CREDITS in the project for all contributors."
+        note.text = "Personal use only. Game by SpookyRick,\n4LD web port by Reeyuki. See CREDITS."
         note.textColor = UIColor(white: 0.5, alpha: 1)
         note.font = .systemFont(ofSize: 11)
         note.textAlignment = .center
@@ -399,8 +406,9 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
 
     // MARK: - Navigation
 
-    /// The bundle is fully offline. Never let the page navigate to a remote
-    /// site — that is the only way an unexpected external overlay could appear.
+    /// The HTML shell is local, but the pinned 4LD 2.1.5 runtime and game data
+    /// come from jsDelivr / GitHub raw. Allow HTTPS subresources while still
+    /// refusing to navigate the main frame to an external page.
     func webView(_ webView: WKWebView,
                  decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -410,6 +418,8 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         }
         let scheme = url.scheme?.lowercased() ?? ""
         if scheme == Self.scheme || scheme == "about" || scheme == "data" {
+            decisionHandler(.allow)
+        } else if scheme == "https" && navigationAction.targetFrame?.isMainFrame != true {
             decisionHandler(.allow)
         } else {
             NSLog("[fb3] blocked external navigation: %@", url.absoluteString)

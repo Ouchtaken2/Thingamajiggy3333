@@ -42,24 +42,26 @@ Follow this once. After that, rebuilding is just "run the workflow again."
 1. In the repo, click the **Actions** tab.
 2. If you see "Get started with GitHub Actions", ignore it — the workflow file
    is already there from `.github/workflows/build-ipa.yml`.
-3. In the left sidebar click **Build Frickbears3 iOS IPA**.
+3. In the left sidebar click **Build Frickbear's 3 4LD iOS IPA**.
 4. Click **Run workflow** (right side) → **Run workflow**.
 5. Wait 5–10 minutes. You can watch the live log; the last steps should say
    `Build succeeded` and print the IPA file size.
 
 **If it fails:** click the red run → the failed job → scroll to the red error
-line and read it. The most common causes are the CDN changing its file list
-(update the regex in `Scripts/fetch-web-build.sh`) or a temporary macOS runner
-issue (just re-run the workflow).
+line and read it. The most common causes are a missing `Game/index.html` (make
+sure you uploaded the whole folder) or a temporary macOS runner issue (re-run
+the workflow). The game data is fetched by the app itself, so there is no big
+download during the build.
 
 ---
 
 ## 3. Get the IPA onto your PC
 
 1. Go back to the completed workflow run.
-2. Scroll to **Artifacts** → click **Frickbears3iOS-IPA**.
-3. It downloads as `Frickbears3iOS-IPA.zip`. Extract it.
-4. Inside is `Frickbears3iOS.ipa` — that's your app.
+2. Scroll to **Artifacts** → click **Frickbears3-4LD-IPA**.
+3. It downloads as `Frickbears3-4LD-IPA.zip`. Extract it.
+4. Inside is `Frickbears3iOS.ipa` — that's your app. (The filename stays the
+   same because it is the Xcode target name; the 4LD build is inside.)
 
 ---
 

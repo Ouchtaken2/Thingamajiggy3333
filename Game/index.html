@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Frickbear's 3 — Four Layers Down (2.1.5)</title>
+
+<script>
+/* Capture every AudioContext the game creates so the click overlay can unlock them. */
+(function () {
+  var Native = window.AudioContext || window.webkitAudioContext;
+  window.__audioContexts = [];
+  if (Native && window.Proxy) {
+    var ProxyContext = new Proxy(Native, {
+      construct: function (target, args, newTarget) {
+        var ctx = Reflect.construct(target, args, newTarget);
+        window.__audioContexts.push(ctx);
+        return ctx;
+      }
+    });
+    window.AudioContext = ProxyContext;
+    window.webkitAudioContext = ProxyContext;
+  }
+})();
+</script>
+
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: radial-gradient(circle at 50% 35%, #1c1726, #060612 70%);
+    color: #eae6f5;
+    font: 14px/1.4 Consolas, "Lucida Console", monospace;
+    overflow: hidden;
+  }
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    background: #000;
+    image-rendering: pixelated;
+    opacity: 0;
+    transition: opacity .6s ease;
+    outline: none;
+  }
+  #canvas.ready { opacity: 1; }
+
+  #hud {
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    z-index: 4;
+    padding: 8px 12px;
+    border: 1px solid #ffffff22;
+    border-radius: 6px;
+    background: #0a0812cc;
+    max-width: min(460px, calc(100vw - 24px));
+  }
+  #hud b { color: #bdff00; }
+  #hud button {
+    float: right;
+    margin: -4px 0 0 12px;
+    padding: 3px 8px;
+    border: 1px solid #ffffff33;
+    border-radius: 4px;
+    background: transparent;
+    color: #cfc9df;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  #hud button:hover { border-color: #bdff00; color: #bdff00; }
+  /* Once the game is actually running, drop every bit of loader branding.
+     Only a very subtle fullscreen button remains (Alt+Enter also works). */
+  #hud.running { background: transparent; border-color: transparent; padding: 0; }
+  #hud.running #build-label, #hud.running #status, #hud.running #bar { display: none; }
+  #hud.running #fsbtn { opacity: .16; margin: 0; transition: opacity .25s; }
+  #hud.running:hover #fsbtn, #hud.running #fsbtn:focus { opacity: 1; }
+  :fullscreen #hud { opacity: .18; transition: opacity .25s; }
+  :fullscreen #hud:hover { opacity: 1; }
+  /* Embedded in the native iOS wrapper: it supplies start + fullscreen. */
+  body.embed #overlay { display: none !important; }
+  body.embed #hud #fsbtn { display: none; }
+  body.embed #hud.running { display: none; }
+  #bar {
+    margin-top: 6px;
+    height: 4px;
+    background: #ffffff18;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #bar > i { display: block; height: 100%; width: 0; background: #bdff00; transition: width .2s; }
+
+  #overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: radial-gradient(circle at 50% 40%, #241a38, #05040b 75%);
+    text-align: center;
+    cursor: pointer;
+  }
+  #overlay h1 {
+    margin: 0;
+    font-size: clamp(22px, 4vw, 42px);
+    letter-spacing: .12em;
+    color: #fff;
+    text-shadow: 3px 3px 0 #fa1e4e;
+  }
+  #overlay p { margin: 0; opacity: .85; max-width: 40ch; }
+  #start {
+    margin-top: 8px;
+    padding: 14px 30px;
+    border: 1px solid #bdff00;
+    border-radius: 6px;
+    background: transparent;
+    color: #bdff00;
+    font: inherit;
+    font-size: 18px;
+    letter-spacing: .14em;
+    cursor: pointer;
+  }
+  #start:hover { background: #bdff0018; }
+  #overlay.hidden { display: none; }
+
+  #error {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 20;
+    max-width: 90vw;
+    padding: 10px 14px;
+    border: 1px solid #fa1e4e88;
+    border-radius: 6px;
+    background: #1a0b12ee;
+    color: #ffd7df;
+    display: none;
+  }
+</style>
+</head>
+<body>
+  <div id="stage"><canvas id="canvas" tabindex="-1"></canvas></div>
+
+  <div id="hud">
+    <div><button id="fsbtn" type="button">FULLSCREEN</button><span id="build-label"><b>4LD · 2.1.5</b> — </span><span id="status">Preparing loader…</span></div>
+    <div id="bar"><i></i></div>
+  </div>
+
+  <div id="overlay">
+    <h1>FOUR LAYERS DOWN</h1>
+    <p>Browser loader for the 2.1.5 web build. Click once so the browser allows game audio.</p>
+    <button id="start" type="button">CLICK TO START</button>
+  </div>
+
+  <div id="error" role="alert"></div>
+
+  <script id="tick-worker" type="javascript/worker">
+    let timer = null;
+    let interval = 1000 / 60;
+    onmessage = function (e) {
+      if (e.data && e.data.fps) interval = 1000 / e.data.fps;
+      if (e.data && e.data.run) {
+        if (timer === null) timer = setInterval(function () { postMessage(1); }, interval);
+      } else if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+  </script>
+
+  <script>
+  (function () {
+    'use strict';
+
+    /* ------------------------------------------------------------------ */
+    /* Configuration                                                       */
+    /* ------------------------------------------------------------------ */
+
+    var ASSET_BASE = 'https://cdn.jsdelivr.net/gh/reeyuki/frickbears3port@2e796a35225c3036b755517d69215d923c0a181f/';
+    // jsDelivr caps individual GitHub files at 20 MB. This one is 48 MB and is
+    // not split by the port, so it has to come from GitHub raw instead.
+    var RAW_BASE = 'https://raw.githubusercontent.com/Reeyuki/frickbears3port/2e796a35225c3036b755517d69215d923c0a181f/';
+    var RAW_FILES = { 'voicelines_death.dat': true };
+
+    function assetUrl(path) {
+      return (RAW_FILES[path] ? RAW_BASE : ASSET_BASE) + path;
+    }
+
+    // Large archives are published by the port as numbered chunks.
+    var SPLIT_SPEC = [['game.unx', 3], ['music.dat', 7], ['voicelines_ingame.dat', 7]];
+    var SPLITS = {};
+    var ALIASES = { 'game.unc': 'game.unx' };
+    SPLIT_SPEC.forEach(function (entry) { SPLITS[entry[0]] = entry[1]; });
+
+    var splitCache = new Map();
+    var pendingSplits = new Map();
+
+    var canvas = document.getElementById('canvas');
+    var hudEl = document.getElementById('hud');
+    var statusEl = document.getElementById('status');
+    var barEl = document.querySelector('#bar > i');
+    var errorEl = document.getElementById('error');
+    var overlay = document.getElementById('overlay');
+    var fsButton = document.getElementById('fsbtn');
+
+    // ?embed=1 (or a native host setting window.__FB3_EMBED) is used by the
+    // iOS wrapper, which provides its own start screen and is already fullscreen.
+    var embedMode = new URLSearchParams(location.search).get('embed') === '1' ||
+                    window.__FB3_EMBED === true;
+    if (embedMode) document.body.classList.add('embed');
+
+    var nativeFetch = window.fetch ? window.fetch.bind(window) : null;
+    var NativeXHR = window.XMLHttpRequest;
+    if (!nativeFetch || !NativeXHR) {
+      fail('This browser is missing fetch or XMLHttpRequest support.');
+      return;
+    }
+
+    function fail(message) {
+      errorEl.textContent = String(message);
+      errorEl.style.display = 'block';
+      console.error(message);
+    }
+
+    function setStatus(text, pct) {
+      statusEl.textContent = text || '';
+      if (typeof pct === 'number') barEl.style.width = Math.max(0, Math.min(100, pct)) + '%';
+    }
+
+    // The runtime reports an empty status when it has finished booting. That is
+    // the moment the loader UI has done its job and should get out of the way.
+    function markRunning() {
+      canvas.classList.add('ready');
+      setStatus('Running', 100);
+      hudEl.classList.add('running');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Canvas sizing + fullscreen                                          */
+    /* ------------------------------------------------------------------ */
+
+    function fitCanvas() {
+      var vw = window.innerWidth || document.documentElement.clientWidth;
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      var cw = canvas.width || 640;
+      var ch = canvas.height || 360;
+      var scale = Math.min(vw / cw, vh / ch);
+      canvas.style.width = Math.floor(cw * scale) + 'px';
+      canvas.style.height = Math.floor(ch * scale) + 'px';
+    }
+
+    window.addEventListener('resize', fitCanvas);
+    if (window.MutationObserver) {
+      new MutationObserver(fitCanvas).observe(canvas, {
+        attributes: true,
+        attributeFilter: ['width', 'height']
+      });
+    }
+    fitCanvas();
+
+    function currentFullscreen() {
+      return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+    }
+
+    function enterFullscreen() {
+      if (currentFullscreen()) return;
+      var target = document.documentElement;
+      var request = target.requestFullscreen || target.webkitRequestFullscreen || target.msRequestFullscreen;
+      if (!request) return;
+      try {
+        var result = request.call(target);
+        if (result && typeof result.catch === 'function') result.catch(function () {});
+      } catch (e) {}
+    }
+
+    function exitFullscreen() {
+      if (!currentFullscreen()) return;
+      var exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if (!exit) return;
+      try { exit.call(document); } catch (e) {}
+    }
+
+    function toggleFullscreen() {
+      if (currentFullscreen()) exitFullscreen();
+      else enterFullscreen();
+    }
+
+    fsButton.addEventListener('click', function (event) {
+      event.stopPropagation();
+      toggleFullscreen();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.altKey && event.key === 'Enter') {
+        event.preventDefault();
+        toggleFullscreen();
+      }
+    });
+
+    /* ------------------------------------------------------------------ */
+    /* Path handling                                                       */
+    /* ------------------------------------------------------------------ */
+
+    function normalize(path) {
+      var p = String(path || '').split('?')[0].split('#')[0].replace(/^\/+/, '');
+      var dir = location.pathname.slice(0, location.pathname.lastIndexOf('/') + 1).replace(/^\/+/, '');
+      if (dir && p.indexOf(dir) === 0) p = p.slice(dir.length).replace(/^\/+/, '');
+      p = p.replace(/^assets\//, '');
+      var file = p.split('/').pop();
+      if (SPLITS[file] || ALIASES[file]) return ALIASES[file] || file;
+      return ALIASES[p] || p;
+    }
+
+    function inspect(input) {
+      if (typeof input === 'string') {
+        var url = new URL(input, location.href);
+        var base = new URL(ASSET_BASE);
+        if (url.href.indexOf(base.href) === 0) {
+          return { path: normalize(url.href.slice(base.href.length)), url: null };
+        }
+        if (url.origin === location.origin) {
+          return { path: normalize(url.pathname), url: null };
+        }
+        return { path: null, url: input };
+      }
+      if (input && typeof input.url === 'string') return inspect(input.url);
+      return { path: null, url: '' };
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Split archive reassembly                                            */
+    /* ------------------------------------------------------------------ */
+
+    function joinBuffers(buffers) {
+      var total = buffers.reduce(function (n, b) { return n + b.byteLength; }, 0);
+      var result = new Uint8Array(total);
+      var offset = 0;
+      buffers.forEach(function (buffer) {
+        result.set(new Uint8Array(buffer), offset);
+        offset += buffer.byteLength;
+      });
+      return result.buffer;
+    }
+
+    function fetchSplit(path, count) {
+      if (splitCache.has(path)) return Promise.resolve(splitCache.get(path));
+      if (pendingSplits.has(path)) return pendingSplits.get(path);
+
+      var job = Promise.all(
+        Array.from({ length: count }, function (_, i) {
+          var name = path + String(i).padStart(2, '0');
+          return nativeFetch(ASSET_BASE + name).then(function (response) {
+            if (!response.ok) throw new Error(name + ' → HTTP ' + response.status);
+            return response.arrayBuffer();
+          });
+        })
+      ).then(function (buffers) {
+        var joined = joinBuffers(buffers);
+        splitCache.set(path, joined);
+        pendingSplits.delete(path);
+        return joined;
+      }).catch(function (err) {
+        pendingSplits.delete(path);
+        throw err;
+      });
+
+      pendingSplits.set(path, job);
+      return job;
+    }
+
+    // Chunks are fetched when the runtime asks for them, then cached for later requests.
+
+    /* ------------------------------------------------------------------ */
+    /* Network shims                                                       */
+    /* ------------------------------------------------------------------ */
+
+    window.fetch = function (input, init) {
+      var info = inspect(input);
+      if (!info.path) return nativeFetch(input, init);
+
+      var count = SPLITS[info.path];
+      if (count) {
+        return fetchSplit(info.path, count).then(function (buffer) {
+          return new Response(buffer, { status: 200, statusText: 'OK' });
+        });
+      }
+
+      var target = assetUrl(info.path);
+      if (typeof Request === 'function' && input instanceof Request) {
+        return nativeFetch(new Request(target, input), init);
+      }
+      return nativeFetch(target, init);
+    };
+
+    function SplitXHR() {
+      this._native = new NativeXHR();
+      this._split = null;
+      this._method = 'GET';
+      this._url = '';
+      this._async = true;
+      this._responseType = '';
+      this._listeners = {};
+
+      this.readyState = 0;
+      this.status = 0;
+      this.statusText = '';
+      this.responseURL = '';
+      this.response = null;
+      this.responseText = '';
+      this.onreadystatechange = null;
+      this.onload = null;
+      this.onerror = null;
+      this.onprogress = null;
+
+      var self = this;
+      Object.defineProperty(this, 'responseType', {
+        configurable: true, enumerable: true,
+        get: function () { return self._responseType; },
+        set: function (value) {
+          self._responseType = value == null ? '' : String(value);
+          try { self._native.responseType = self._responseType; } catch (e) {}
+        }
+      });
+
+      this._native.onreadystatechange = function () {
+        if (self._split) return;
+        self.readyState = self._native.readyState;
+        self.status = self._native.status;
+        self.statusText = self._native.statusText;
+        try { self.responseURL = self._native.responseURL || self._url; } catch (e) { self.responseURL = self._url; }
+        try { self.response = self._native.response; } catch (e) { self.response = null; }
+        try { self.responseText = self._native.responseText || ''; } catch (e) { self.responseText = ''; }
+        self._emit('readystatechange');
+        if (self.readyState === 4) self._emit(self.status >= 200 && self.status < 300 ? 'load' : 'error');
+      };
+      this._native.onprogress = function (event) { if (!self._split) self._emit('progress', event); };
+    }
+
+    SplitXHR.prototype._emit = function (type, event) {
+      var list = this._listeners[type];
+      if (list) list.slice().forEach(function (fn) { try { fn.call(this, event); } catch (e) {} }, this);
+      var handler = this['on' + type];
+      if (typeof handler === 'function') {
+        try { handler.call(this, event); } catch (e) {}
+      }
+    };
+
+    SplitXHR.prototype.open = function (method, url, async, user, password) {
+      this._method = method;
+      this._url = url;
+      this._async = async !== false;
+      var info = inspect(url);
+      var count = info.path ? SPLITS[info.path] : 0;
+      this._split = count ? { path: info.path, count: count } : null;
+      this.readyState = 1;
+      if (!this._split) {
+        this._native.open(method, info.path ? assetUrl(info.path) : info.url, this._async, user, password);
+        try { this._native.responseType = this._responseType; } catch (e) {}
+      }
+      this._emit('readystatechange');
+    };
+
+    SplitXHR.prototype.send = function (body) {
+      if (!this._split) return this._native.send(body);
+
+      var self = this;
+      this.readyState = 2;
+      this._emit('progress', { lengthComputable: true, loaded: 0, total: 0 });
+      this._emit('readystatechange');
+
+      var deliver = function (buffer) {
+        self.status = 200;
+        self.statusText = 'OK';
+        self.responseURL = ASSET_BASE + self._split.path;
+        self.readyState = 4;
+        self._emit('progress', { lengthComputable: true, loaded: buffer.byteLength, total: buffer.byteLength });
+        if (self._responseType === 'arraybuffer') {
+          self.response = buffer;
+          self.responseText = '';
+        } else if (self._responseType === 'blob') {
+          self.response = new Blob([buffer]);
+          self.responseText = '';
+        } else {
+          var text = new TextDecoder('utf-8').decode(new Uint8Array(buffer));
+          self.responseText = text;
+          self.response = self._responseType === 'json' ? JSON.parse(text) : text;
+        }
+        self._emit('readystatechange');
+        self._emit('load');
+      };
+
+      var reject = function () {
+        self.status = 404;
+        self.statusText = 'Not Found';
+        self.readyState = 4;
+        self._emit('readystatechange');
+        self._emit('error');
+      };
+
+      var cached = splitCache.get(this._split.path);
+      if (cached) deliver(cached);
+      else fetchSplit(this._split.path, this._split.count).then(deliver, reject);
+    };
+
+    SplitXHR.prototype.abort = function () { if (!this._split) this._native.abort(); };
+    SplitXHR.prototype.setRequestHeader = function (h, v) { if (!this._split) this._native.setRequestHeader(h, v); };
+    SplitXHR.prototype.getResponseHeader = function (h) { return this._split ? null : this._native.getResponseHeader(h); };
+    SplitXHR.prototype.getAllResponseHeaders = function () { return this._split ? '' : this._native.getAllResponseHeaders(); };
+    SplitXHR.prototype.overrideMimeType = function (t) { if (!this._split) this._native.overrideMimeType(t); };
+    SplitXHR.prototype.addEventListener = function (type, fn) {
+      (this._listeners[type] = this._listeners[type] || []).push(fn);
+    };
+    SplitXHR.prototype.removeEventListener = function (type, fn) {
+      var list = this._listeners[type];
+      if (!list) return;
+      var i = list.indexOf(fn);
+      if (i >= 0) list.splice(i, 1);
+    };
+    window.XMLHttpRequest = SplitXHR;
+
+    /* ------------------------------------------------------------------ */
+    /* Emscripten module                                                   */
+    /* ------------------------------------------------------------------ */
+
+    var Module = window.Module = {
+      canvas: canvas,
+      arguments: location.search.slice(1).split('&').filter(Boolean)
+        .filter(function (a) { return a.split('=')[0] !== 'embed'; }),
+      preRun: [],
+      postRun: [function () { window.onerror = function (message) { fail('Runtime error: ' + message); }; }],
+      locateFile: function (path) { return assetUrl(normalize(path)); },
+      print: function () {
+        console.log.apply(console, arguments);
+      },
+      printErr: function () {
+        console.error.apply(console, arguments);
+      },
+      setStatus: function (text) {
+        if (!text) {
+          markRunning();
+          return;
+        }
+        var match = text.match(/\((\d+)\/(\d+)\)/);
+        if (match) {
+          setStatus(text, 100 * Number(match[1]) / Math.max(1, Number(match[2])));
+        } else {
+          setStatus(text);
+        }
+      },
+      monitorRunDependencies: function (remaining) {
+        Module.totalDependencies = Math.max(Module.totalDependencies || 0, remaining);
+      }
+    };
+    Module.totalDependencies = 0;
+
+    window.onerror = function (message) {
+      fail('Startup error: ' + message);
+    };
+
+    /* Callbacks the GameMaker runtime expects from its HTML shell. */
+    window.g_pWadLoadCallback = undefined;
+    window.g_pAddAsyncMethod = -1;
+    window.g_pJSExceptionHandler = undefined;
+    window.setWadLoadCallback = function (callback) { window.g_pWadLoadCallback = callback; };
+    window.setAddAsyncMethod = function (method) { window.g_pAddAsyncMethod = method; };
+    window.setJSExceptionHandler = function (handler) {
+      if (typeof handler === 'function') window.g_pJSExceptionHandler = handler;
+    };
+    window.hasJSExceptionHandler = function () {
+      return typeof window.g_pJSExceptionHandler === 'function';
+    };
+    window.doJSExceptionHandler = function (json) {
+      if (typeof window.g_pJSExceptionHandler === 'function') {
+        window.g_pJSExceptionHandler(JSON.parse(json));
+      }
+    };
+
+    /* ------------------------------------------------------------------ */
+    /* Audio + click-to-start                                              */
+    /* ------------------------------------------------------------------ */
+
+    function unlockAudio() {
+      window.__audioContexts.forEach(function (ctx) {
+        if (ctx.state === 'suspended' && typeof ctx.resume === 'function') ctx.resume();
+      });
+      overlay.classList.add('hidden');
+      canvas.focus();
+      if (!embedMode) enterFullscreen();
+    }
+    document.getElementById('start').addEventListener('click', unlockAudio);
+    overlay.addEventListener('click', unlockAudio);
+
+    // Hooks used by the native iOS wrapper's WebBridge.start(). Keeping the
+    // same names means one loader file works in the browser and in the app.
+    window.__fb3_unlockAudio = unlockAudio;
+    window.__fb3_revealCanvas = function () { canvas.classList.add('ready'); };
+
+    /* ------------------------------------------------------------------ */
+    /* Keep multiplayer alive while the tab is hidden                      */
+    /* ------------------------------------------------------------------ */
+
+    try {
+      var workerSource = document.getElementById('tick-worker').textContent;
+      var tickWorker = new Worker(URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' })));
+      tickWorker.onmessage = function () {
+        var tick = window.GM_tick || (window.Module && window.Module.GM_tick);
+        if (typeof tick === 'function') tick(performance.now());
+      };
+      document.addEventListener('visibilitychange', function () {
+        var multiplayer = window.GM_is_multiplayer || (window.Module && window.Module.GM_is_multiplayer);
+        if (typeof multiplayer === 'function' && multiplayer() === 0) return;
+        tickWorker.postMessage(document.hidden ? { run: true, fps: 60 } : { run: false });
+      });
+    } catch (e) {
+      console.warn('Background tick worker unavailable:', e);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Fetch the manifest, then start the runtime                          */
+    /* ------------------------------------------------------------------ */
+
+    setStatus('Reading build manifest…', 2);
+    nativeFetch(ASSET_BASE + 'runner.json')
+      .then(function (response) {
+        if (!response.ok) throw new Error('runner.json → HTTP ' + response.status);
+        return response.json();
+      })
+      .then(function (manifest) {
+        window.manifestFiles = function () { return manifest.manifestFiles.join(';'); };
+        window.manifestFilesMD5 = function () { return manifest.manifestFilesMD5.join(';'); };
+        setStatus('Loading runtime…', 12);
+
+        var script = document.createElement('script');
+        script.src = ASSET_BASE + manifest.mainJS;
+        script.onerror = function () { fail('Could not load ' + manifest.mainJS); };
+        document.head.appendChild(script);
+      })
+      .catch(function (err) { fail(err.message); });
+  })();
+  </script>
+</body>
+</html>
