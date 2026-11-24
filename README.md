@@ -1,9 +1,9 @@
 # Frickbear's 3 — Four Layers Down 2.1.5 (iOS IPA wrapper)
 
 An unofficial iOS wrapper for the **4LD / 2.1.5** web build of
-**Five Nights at Frickbear's 3**. It runs the same pinned build as the
-standalone browser loader (`../frickbears3-4ld-v215-loader/index.html`), but
-inside a native app with:
+**Five Nights at Frickbear's 3**. The full game is downloaded at build time and
+bundled inside the app, so it works offline at launch, inside a native shell
+with:
 
 - a real fullscreen canvas and audio unlocked by a native tap
 - an on-screen gamepad overlay plus optional tap-to-mouse mode
@@ -13,15 +13,15 @@ inside a native app with:
 - a small bundled `PortAssets/` index of recovered GML/sprites/audio for the native rewrite
 - no Safari UI, no ads
 
-The build is pinned to commit `2e796a35225c3036b755517d69215d923c0a181f` of
-`Reeyuki/frickbears3port`. The "4LD · 2.1.5" loading label fades out as soon as
-the game itself is running.
+The GitHub Actions workflow fetches the complete `Game/` bundle from the
+publicly hosted web port (`https://cdn.gachaplay.online/games/frickbears-3`)
+before building. The finished IPA contains the runtime, archives, textures and
+audio — no internet is needed on the iPhone.
 
-> **Internet is required.** The IPA contains only the tiny HTML shell. The
-> runtime and game data (several hundred MB) are downloaded on first launch
-> from jsDelivr / GitHub raw. Use a stable Wi-Fi connection and be patient.
-> Saves live in the app's own WebKit storage, not in the IPA — deleting the app
-> deletes your saves.
+> **Offline at launch.** All game files are bundled into the app and served
+> locally through `fb3://`. Internet is only needed when building the IPA in
+> the cloud. Saves live in the app's own WebKit storage, not in the IPA —
+> deleting the app deletes your saves.
 
 > Personal, non-commercial use only. See [CREDITS.md](CREDITS.md).
 
@@ -46,11 +46,12 @@ consume your monthly free quota.
 
 1. Open the repo on GitHub → **Actions** tab.
 2. Select **Build Frickbear's 3 4LD iOS IPA** → **Run workflow** → green button.
-3. Wait ~5 minutes. The workflow generates the Xcode project with XcodeGen,
-   builds an unsigned `.app` and zips it into an `.ipa`.
+3. Wait ~5–8 minutes. The workflow downloads the full ~46 MB web build,
+   generates the Xcode project with XcodeGen, builds an unsigned `.app` and
+   zips it into an `.ipa`.
 4. Click the completed run → **Artifacts** → download
    **Frickbears3-4LD-IPA** (a .zip). Extract it to get `Frickbears3iOS.ipa`.
-   The IPA is small (~1 MB) because the game data is fetched on the device.
+   The IPA is around **35 MB** because the complete game is bundled inside.
 
 ### 3. Sign & install on your iPhone with Sideloadly (Windows)
 

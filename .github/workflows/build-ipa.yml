@@ -10,9 +10,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Game/index.html is still the pinned 4LD 2.1.5 loader. PortAssets is a
-      # small curated slice of recovered assets for the native port; the web
-      # shell continues to fetch its runtime from jsDelivr at launch.
+      # The full GameMaker HTML5 build is downloaded at build time so the
+      # shipped IPA contains the whole game and works offline. PortAssets is a
+      # small curated slice of recovered assets for the native port.
+      - name: Download full web build
+        run: bash Scripts/fetch-web-build.sh
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -46,9 +48,14 @@ jobs:
           mkdir -p Payload/Frickbears3iOS.app/PortAssets
           cp -R PortAssets/. Payload/Frickbears3iOS.app/PortAssets/
 
-          # Fail loudly if the loader or asset manifest did not make it in.
+          # Fail loudly if any part of the offline bundle is missing.
           test -f Payload/Frickbears3iOS.app/Game/index.html
-          grep -q "FOUR LAYERS DOWN" Payload/Frickbears3iOS.app/Game/index.html
+          grep -q "manifestFiles" Payload/Frickbears3iOS.app/Game/index.html
+          for f in runner.js runner.wasm runner.data audio-worklet.js game.unx \
+                   manifest.webmanifest icon-192.png runner.svg \
+                   display_mouse_lock.js NekoPresence.js; do
+            test -f "Payload/Frickbears3iOS.app/Game/$f"
+          done
           test -f Payload/Frickbears3iOS.app/PortAssets/manifest.json
 
           du -sh Payload/Frickbears3iOS.app/Game
