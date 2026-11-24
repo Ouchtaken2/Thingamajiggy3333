@@ -1,13 +1,15 @@
 import UIKit
 
 /// In-app button mapping editor. Changes are saved immediately to UserDefaults.
+/// With a context, edits apply only to that control profile.
 final class RemapViewController: UITableViewController {
 
-    private let store = TouchMappingStore.shared
+    private let context: ControlContext?
     private let cellIdentifier = "MappingCell"
     var onDismiss: (() -> Void)?
 
-    init() {
+    init(context: ControlContext? = nil) {
+        self.context = context
         super.init(style: .insetGrouped)
     }
 
@@ -17,7 +19,7 @@ final class RemapViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Button Mapping"
+        title = context == nil ? "Button Mapping" : "\(context!.title) Mapping"
         tableView.register(
             UITableViewCell.self,
             forCellReuseIdentifier: cellIdentifier
@@ -36,7 +38,9 @@ final class RemapViewController: UITableViewController {
         )
 
         let note = UILabel(frame: CGRect(x: 0, y: 0, width: 0, height: 56))
-        note.text = "Tap a button, then pick the key it should send.\nSaved automatically. Use MOUSE for doors and the monitor."
+        note.text = context == nil
+            ? "Tap a button, then pick the key it should send.\nSaved automatically. Use MOUSE for doors and the monitor."
+            : "Tap a button to remap it for \(context!.title.lowercased()).\nOther profiles keep their own bindings."
         note.numberOfLines = 0
         note.textAlignment = .center
         note.font = .systemFont(ofSize: 12)
@@ -56,7 +60,13 @@ final class RemapViewController: UITableViewController {
     }
 
     @objc private func resetTapped() {
-        store.resetToDefaults()
+        if let context {
+            ControlProfileStore.shared.update(context) { profile in
+                profile.mappings = ControlProfileStore.defaultProfiles[context]!.mappings
+            }
+        } else {
+            TouchMappingStore.shared.resetToDefaults()
+        }
         tableView.reloadData()
     }
 
@@ -68,7 +78,7 @@ final class RemapViewController: UITableViewController {
         let action = TouchAction.allCases[indexPath.row]
         let cell = UITableViewCell(style: .value1, reuseIdentifier: cellIdentifier)
         cell.textLabel?.text = action.title
-        cell.detailTextLabel?.text = store.label(for: action)
+        cell.detailTextLabel?.text = label(for: action)
         cell.detailTextLabel?.textColor = .systemBlue
         cell.accessoryType = .disclosureIndicator
         return cell
@@ -78,9 +88,16 @@ final class RemapViewController: UITableViewController {
         tableView.deselectRow(at: indexPath, animated: true)
         let action = TouchAction.allCases[indexPath.row]
         navigationController?.pushViewController(
-            KeyPickerViewController(action: action),
+            KeyPickerViewController(action: action, context: context),
             animated: true
         )
+    }
+
+    private func label(for action: TouchAction) -> String {
+        if let context {
+            return ControlProfileStore.shared.label(for: action, context: context)
+        }
+        return TouchMappingStore.shared.label(for: action)
     }
 }
 
@@ -89,12 +106,13 @@ final class RemapViewController: UITableViewController {
 final class KeyPickerViewController: UITableViewController {
 
     private let action: TouchAction
-    private let store = TouchMappingStore.shared
+    private let context: ControlContext?
     private let keys = TouchMappingStore.availableKeys
     private let cellIdentifier = "KeyCell"
 
-    init(action: TouchAction) {
+    init(action: TouchAction, context: ControlContext? = nil) {
         self.action = action
+        self.context = context
         super.init(style: .insetGrouped)
         title = action.title
     }
@@ -117,7 +135,12 @@ final class KeyPickerViewController: UITableViewController {
         let cell = tableView.dequeueReusableCell(withIdentifier: cellIdentifier, for: indexPath)
         cell.textLabel?.text = option.label
 
-        let current = store.entry(for: action)
+        let current: TouchEntry
+        if let context {
+            current = ControlProfileStore.shared.entry(for: action, context: context)
+        } else {
+            current = TouchMappingStore.shared.entry(for: action)
+        }
         cell.accessoryType = (current.keyCode == option.keyCode && current.code == option.code)
             ? .checkmark
             : .none
@@ -125,7 +148,12 @@ final class KeyPickerViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        store.set(keys[indexPath.row], for: action)
+        let option = keys[indexPath.row]
+        if let context {
+            ControlProfileStore.shared.setEntry(option.entry, for: action, context: context)
+        } else {
+            TouchMappingStore.shared.set(option, for: action)
+        }
         navigationController?.popViewController(animated: true)
     }
 }

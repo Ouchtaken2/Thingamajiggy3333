@@ -14,6 +14,7 @@ targets:
       - path: App
     resources:
       - path: Game
+      - path: PortAssets
     settings:
       configs:
         Debug:

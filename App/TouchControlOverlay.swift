@@ -11,9 +11,17 @@ final class TouchControlOverlay: UIView {
     var onZoomToggle: (() -> Void)?
 
     private var actionButtons: [ActionButton] = []
+    private var sizedControls: [SizedControl] = []
     private var mouseEnabled = false
     private var mouseButton: UIButton!
     private var zoomButton: UIButton!
+
+    private struct SizedControl {
+        let view: UIButton
+        let baseSize: CGFloat
+        let width: NSLayoutConstraint
+        let height: NSLayoutConstraint
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -24,12 +32,34 @@ final class TouchControlOverlay: UIView {
         TouchMappingStore.shared.onChange = { [weak self] in
             self?.refreshTitles()
         }
+        ControlProfileStore.shared.onChange = { [weak self] in
+            self?.refreshConfig()
+        }
     }
 
     /// Called by GameViewController when app config changes (it owns the
     /// single AppConfigStore.onChange closure).
     func refreshConfig() {
-        zoomButton.isHidden = !AppConfigStore.shared.showZoomButton
+        let config = AppConfigStore.shared
+        let profile = ControlProfileStore.shared.profile()
+        let scale = config.uiScale * profile.uiScale
+
+        zoomButton.isHidden = !config.showZoomButton
+
+        for control in sizedControls {
+            control.width.constant = control.baseSize * scale
+            control.height.constant = control.baseSize * scale
+            control.view.alpha = profile.buttonOpacity
+        }
+
+        for button in actionButtons {
+            switch button.action {
+            case .up, .down, .left, .right:
+                button.isHidden = !profile.showDpad
+            default:
+                button.isHidden = !profile.showActionButtons
+            }
+        }
     }
 
     func setZoomLabel(_ text: String) {
@@ -115,12 +145,17 @@ final class TouchControlOverlay: UIView {
         return button
     }
 
-    private func place(_ button: UIButton, x: CGFloat, y: CGFloat, size: CGFloat = 54) {
+    @discardableResult
+    private func place(_ button: UIButton, x: CGFloat, y: CGFloat, size: CGFloat = 54)
+        -> (width: NSLayoutConstraint, height: NSLayoutConstraint) {
         button.translatesAutoresizingMaskIntoConstraints = false
         addSubview(button)
+
+        let width = button.widthAnchor.constraint(equalToConstant: size)
+        let height = button.heightAnchor.constraint(equalToConstant: size)
         NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: size),
-            button.heightAnchor.constraint(equalToConstant: size),
+            width,
+            height,
             button.centerXAnchor.constraint(
                 equalTo: centerXAnchor,
                 constant: x * UIScreen.main.bounds.width
@@ -130,6 +165,14 @@ final class TouchControlOverlay: UIView {
                 constant: y * UIScreen.main.bounds.height
             )
         ])
+
+        sizedControls.append(SizedControl(
+            view: button,
+            baseSize: size,
+            width: width,
+            height: height
+        ))
+        return (width, height)
     }
 
     private func refreshTitles() {

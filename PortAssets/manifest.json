@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "displayName": "Frickbears 3 native port asset index",
+  "source": {
+    "build": "Four Layers Down 2.1.5",
+    "gameDirectory": "../frickbears3-4ld-v2.1.5",
+    "codeDirectory": "../frickbears3-4ld-v2.1.5/Export_Code",
+    "codeReferenceDirectory": "Code/Reference",
+    "assemblyDirectory": "../frickbears3-4ld-v2.1.5/Open AI stuff",
+    "textureGroupsGlob": "../frickbears3-4ld-v2.1.5/texgroup_*"
+  },
+  "rooms": {
+    "office": "Rooms/Office.png",
+    "minigameMap": "Rooms/MinigameMap.png",
+    "fredbearMinigames": "Rooms/FredbearMinigames.png",
+    "fredbearMonitorMinigame": "Rooms/Fredbear_MonitorMinigame.png"
+  },
+  "minigames": {
+    "fredsweeper": {
+      "displayName": "Fredsweeper",
+      "surfaceWidth": 160,
+      "surfaceHeight": 144,
+      "boardWidth": 10,
+      "boardHeight": 8,
+      "tileSize": 16,
+      "mines": 10,
+      "code": {
+        "create": "../Export_Code/gml_Object_oMinigame_FreddyFazsweep_Create_0.gml",
+        "draw": "../Export_Code/gml_Object_oMinigame_FreddyFazsweep_Draw_0.gml"
+      },
+      "spriteSets": [
+        {
+          "id": "tiles",
+          "folder": "Fredsweeper/Sprites/sFFS_Tiles",
+          "framePrefix": "sFFS_Tiles_",
+          "frameCount": 17
+        },
+        {
+          "id": "tilesSmall",
+          "folder": "Fredsweeper/Sprites/sFFS_TilesSmall",
+          "framePrefix": "sFFS_TilesSmall_",
+          "frameCount": 15
+        }
+      ],
+      "fontSets": [
+        {
+          "id": "gameboy",
+          "folder": "Fredsweeper/Fonts/sFontGameboy",
+          "framePrefix": "sFontGameboy_",
+          "frameCount": 80
+        }
+      ],
+      "audio": [
+        {
+          "id": "reveal",
+          "file": "Fredsweeper/Audio/sfxBitCrunch.ogg"
+        },
+        {
+          "id": "chord",
+          "file": "Fredsweeper/Audio/sfxBitCrunch.ogg"
+        },
+        {
+          "id": "flag",
+          "file": "Fredsweeper/Audio/sfxBitPlace.ogg"
+        },
+        {
+          "id": "explosion",
+          "file": "Fredsweeper/Audio/sfxBitExplosion.ogg"
+        }
+      ]
+    },
+    "goldenFredsweeper": {
+      "displayName": "Golden Fredsweeper",
+      "surfaceWidth": 160,
+      "surfaceHeight": 144,
+      "boardWidth": 20,
+      "boardHeight": 16,
+      "tileSize": 8,
+      "mines": 60,
+      "code": {
+        "create": "../Export_Code/gml_Object_oMinigame_GoldenFazsweep_Create_0.gml",
+        "draw": "../Export_Code/gml_Object_oMinigame_GoldenFazsweep_Draw_0.gml"
+      },
+      "spriteSets": [
+        {
+          "id": "tilesSmall",
+          "folder": "Fredsweeper/Sprites/sFFS_TilesSmall",
+          "framePrefix": "sFFS_TilesSmall_",
+          "frameCount": 15
+        }
+      ],
+      "fontSets": [
+        {
+          "id": "gameboy",
+          "folder": "Fredsweeper/Fonts/sFontGameboy",
+          "framePrefix": "sFontGameboy_",
+          "frameCount": 80
+        }
+      ],
+      "audio": [
+        {
+          "id": "reveal",
+          "file": "Fredsweeper/Audio/sfxBitCrunch.ogg"
+        },
+        {
+          "id": "chord",
+          "file": "Fredsweeper/Audio/sfxBitCrunch.ogg"
+        },
+        {
+          "id": "flag",
+          "file": "Fredsweeper/Audio/sfxBitPlace.ogg"
+        },
+        {
+          "id": "explosion",
+          "file": "Fredsweeper/Audio/sfxBitExplosion.ogg"
+        }
+      ]
+    }
+  }
+}

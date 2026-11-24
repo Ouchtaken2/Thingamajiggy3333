@@ -10,9 +10,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Game/index.html is the pinned 4LD 2.1.5 loader committed to this repo.
-      # It pulls the runtime/assets from jsDelivr at runtime, so there is no
-      # giant download or asset-bundling step here.
+      # Game/index.html is still the pinned 4LD 2.1.5 loader. PortAssets is a
+      # small curated slice of recovered assets for the native port; the web
+      # shell continues to fetch its runtime from jsDelivr at launch.
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -42,11 +42,17 @@ jobs:
           mkdir -p Payload/Frickbears3iOS.app/Game
           cp -R Game/. Payload/Frickbears3iOS.app/Game/
 
-          # Fail loudly if the loader did not make it in.
+          # Curated recovered assets for the in-progress native port.
+          mkdir -p Payload/Frickbears3iOS.app/PortAssets
+          cp -R PortAssets/. Payload/Frickbears3iOS.app/PortAssets/
+
+          # Fail loudly if the loader or asset manifest did not make it in.
           test -f Payload/Frickbears3iOS.app/Game/index.html
           grep -q "FOUR LAYERS DOWN" Payload/Frickbears3iOS.app/Game/index.html
+          test -f Payload/Frickbears3iOS.app/PortAssets/manifest.json
 
           du -sh Payload/Frickbears3iOS.app/Game
+          du -sh Payload/Frickbears3iOS.app/PortAssets
           zip -qry Frickbears3iOS.ipa Payload
           ls -lh Frickbears3iOS.ipa
 

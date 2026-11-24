@@ -9,6 +9,8 @@ inside a native app with:
 - an on-screen gamepad overlay plus optional tap-to-mouse mode
 - automatic pause/resume when the app backgrounds
 - configurable game speed, FPS/RAM HUD and a 1×/2×/3× zoom button for minigames
+- control profiles, overlay scaling and Fredsweeper touch-scheme settings
+- a small bundled `PortAssets/` index of recovered GML/sprites/audio for the native rewrite
 - no Safari UI, no ads
 
 The build is pinned to commit `2e796a35225c3036b755517d69215d923c0a181f` of
@@ -101,7 +103,37 @@ All options are saved on the device instantly — **no rebuild required**.
   screen showing rendered frames per second and the app's real RAM usage in MB.
 - **Minigame Zoom Button** — show/hide the 🔍 button. While zoomed: **tap to
   click**, **drag to pan**. Zoom wins over MOUSE mode until you return to 1×.
+- **Control Profiles** — separate Free Roam / Office / Minigame bindings, camera
+  mode, button size and opacity. The web shell switches manually; the native
+  port will switch automatically by room.
+- **Overlay Scale** — global multiplier applied on top of the active profile.
+- **Fredsweeper Controls** — `FLAG toggle` (default), `Hold FLAG + tap`,
+  `Long-press flag` or `D-pad cursor`.
+- **Minigame Board Scale** — 2×–4× board fit target. Golden Fredsweeper still
+  benefits from pan/zoom or cursor mode.
+- **Haptics** — vibration feedback for controls.
+- **Mods** — toggles for future JSON/asset-override mods. No mod loader is
+  active in the current web shell yet.
 - **Reset All** (top right) restores every option and all key mappings.
+
+## Native port assets
+
+`PortAssets/` contains a curated, tiny slice of the recovered GameMaker dump:
+
+- `manifest.json` — logical asset index and board constants
+- `Code/Reference/` — decompiled Fredsweeper/minigame GML for reference
+- `Fredsweeper/` — tile sprites, font frames and three SFX
+- `Rooms/` — office/minigame room images
+
+The full ~1 GB dump stays on your PC. To refresh this curated slice after a new
+decompile/export, run:
+
+```powershell
+.\Scripts\import-port-assets.ps1
+```
+
+The current IPA still uses the web loader and still needs internet on first
+launch. These assets are the foundation for the offline native port.
 
 ---
 
