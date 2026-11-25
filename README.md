@@ -117,6 +117,10 @@ All options are saved on the device instantly — **no rebuild required**.
 - **Haptics** — vibration feedback for controls.
 - **Mods** — toggles for future JSON/asset-override mods. No mod loader is
   active in the current web shell yet.
+- **Inspect Page** — dump of what the web view is actually rendering.
+- **Export Error Log** — share the captured JS/native diagnostic log. It can
+  also be found as `frickbears3-diagnostic.log` in the app's Documents folder
+  (visible in the iOS Files app). Use this if loading hangs.
 - **Reset All** (top right) restores every option and all key mappings.
 
 ## Native port assets
@@ -135,20 +139,18 @@ decompile/export, run:
 .\Scripts\import-port-assets.ps1
 ```
 
-The current IPA still uses the web loader and still needs internet on first
-launch. These assets are the foundation for the offline native port.
+The current IPA bundles the full web loader, so it works offline. These assets
+are the foundation for the true native port.
 
 ---
 
 ## Troubleshooting
 
-- **Stuck on "Reading build manifest…" / "Loading runtime…"** — check your
-  internet connection. jsDelivr and GitHub raw must both be reachable; the
-  48 MB `voicelines_death.dat` comes from GitHub raw because jsDelivr rejects
-  files over 20 MB.
-- **First launch takes a long time** — expected. Several hundred MB of split
-  archives are downloaded and reassembled. Later launches are faster where
-  WebKit can reuse its cache.
+- **Stuck at 88% / "Preparing... (7/8)"** — tap **TAP TO START** first if you
+  have not, then wait a little. If it still hangs, tap **Export Error Log** on
+  the intro screen or **⚙ → Diagnostics → Export Error Log** and send the log.
+- **First launch takes a long time** — the app reads the bundled 46 MB game
+  from the IPA; no internet is needed. Audio may stay muted until the first tap.
 - **Black screen after TAP TO START** — the device may be low on RAM.
   Close other apps, restart the phone, and reopen. The runtime needs enough
   memory to hold the reassembled archives.

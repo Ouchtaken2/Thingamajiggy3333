@@ -70,6 +70,7 @@ echo "==> Resolving file list from manifestFiles()"
 python3 - "$DEST/index.html" "$BASE" "$DEST" <<'PY'
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -98,7 +99,8 @@ files += [
     "NekoPresence.js",
 ]
 
-# runnerLocal.svg does not exist on the CDN; index.html falls back to runner.svg.
+# runnerLocal.svg does not exist on the CDN; bundle a copy locally so the
+# runner's hidden <img> does not generate a 404 during startup.
 
 # Preserve order, remove duplicates.
 files = list(dict.fromkeys(f.strip() for f in files if f.strip()))
@@ -125,6 +127,12 @@ for i, name in enumerate(files, 1):
         "-o", partial, base + "/" + name,
     ], check=True)
     os.replace(partial, out)
+
+runner_svg = os.path.join(dest, "runner.svg")
+local_runner_svg = os.path.join(dest, "runnerLocal.svg")
+if os.path.exists(runner_svg) and not os.path.exists(local_runner_svg):
+    shutil.copyfile(runner_svg, local_runner_svg)
+    print("==> Added local runnerLocal.svg copy")
 
 total = sum(
     os.path.getsize(os.path.join(root, f))

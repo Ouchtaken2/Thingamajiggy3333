@@ -66,7 +66,7 @@ final class SettingsViewController: UITableViewController {
         switch section {
         case 0: return 3  // controls
         case 1: return 2  // gameplay
-        case 2: return 3  // diagnostics
+        case 2: return 4  // diagnostics
         case 3: return 4  // minigames
         default: return 3 // mods
         }
@@ -124,6 +124,10 @@ final class SettingsViewController: UITableViewController {
             }
         case (2, 2):
             cell.textLabel?.text = "Inspect Page"
+            cell.accessoryType = .disclosureIndicator
+        case (2, 3):
+            cell.textLabel?.text = "Export Error Log"
+            cell.detailTextLabel?.text = "Share"
             cell.accessoryType = .disclosureIndicator
 
         case (3, 0):
@@ -196,6 +200,16 @@ final class SettingsViewController: UITableViewController {
             navigationController?.pushViewController(SpeedPickerViewController(), animated: true)
         case (2, 2):
             onInspect?()
+        case (2, 3):
+            DiagnosticLog.shared.add("error log exported from settings", source: "ui")
+            navigationController?.pushViewController(
+                InspectViewController(
+                    text: DiagnosticLog.shared.currentText(),
+                    title: "Error Log",
+                    fileURL: DiagnosticLog.shared.exportFileURL()
+                ),
+                animated: true
+            )
         case (3, 0):
             let schemes = FredsweeperTouchScheme.allCases
             let current = schemes.firstIndex(of: config.fredsweeperScheme) ?? 0
@@ -535,11 +549,13 @@ final class ProfileDetailViewController: UITableViewController {
 final class InspectViewController: UIViewController {
 
     private let text: String
+    private let fileURL: URL?
 
-    init(text: String) {
+    init(text: String, title: String = "Page Inspect", fileURL: URL? = nil) {
         self.text = text
+        self.fileURL = fileURL
         super.init(nibName: nil, bundle: nil)
-        title = "Page Inspect"
+        self.title = title
     }
 
     required init?(coder: NSCoder) {
@@ -553,6 +569,13 @@ final class InspectViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        if navigationController?.viewControllers.first === self {
+            navigationItem.leftBarButtonItem = UIBarButtonItem(
+                barButtonSystemItem: .done,
+                target: self,
+                action: #selector(doneTapped)
+            )
+        }
         navigationItem.rightBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .action,
             target: self,
@@ -574,8 +597,15 @@ final class InspectViewController: UIViewController {
         ])
     }
 
+    @objc private func doneTapped() {
+        dismiss(animated: true)
+    }
+
     @objc private func shareTapped() {
-        let activity = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        var items: [Any] = [text]
+        if let fileURL { items.append(fileURL) }
+        let activity = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        activity.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItem
         present(activity, animated: true)
     }
 }

@@ -5,6 +5,7 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
 
     private static let scheme = "fb3"
     private static let statsHandler = "fb3stats"
+    private static let logHandler = "fb3log"
 
     private var webView: WKWebView!
     private var intro: UIView!
@@ -36,6 +37,8 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         NotificationCenter.default.removeObserver(self)
         webView?.configuration.userContentController
             .removeScriptMessageHandler(forName: Self.statsHandler)
+        webView?.configuration.userContentController
+            .removeScriptMessageHandler(forName: Self.logHandler)
         AppConfigStore.shared.onChange = nil
     }
 
@@ -51,6 +54,7 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        logLaunchInfo()
         buildWebView()
         buildIntro()
         buildOverlay()
@@ -74,7 +78,28 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
 
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
+        DiagnosticLog.shared.add("memory warning", level: "WARN", source: "ui")
         URLCache.shared.removeAllCachedResponses()
+    }
+
+    private func logLaunchInfo() {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        DiagnosticLog.shared.add("launch version=\(version) build=\(build)")
+
+        if let gameDir = Bundle.main.resourceURL?.appendingPathComponent("Game", isDirectory: true),
+           let files = try? FileManager.default.contentsOfDirectory(atPath: gameDir.path) {
+            let summary = files.sorted().map { name -> String in
+                let size = (try? FileManager.default.attributesOfItem(
+                    atPath: gameDir.appendingPathComponent(name).path
+                )[.size] as? NSNumber)?.intValue ?? 0
+                return "\(name)(\(size))"
+            }.joined(separator: ", ")
+            DiagnosticLog.shared.add("bundled Game files: \(summary)")
+        } else {
+            DiagnosticLog.shared.add("WARNING: could not list bundled Game directory",
+                                     level: "WARN")
+        }
     }
 
     // MARK: - Web view
@@ -89,6 +114,7 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         // Always-on helpers injected before the page scripts run.
         let userContent = config.userContentController
         userContent.add(self, name: Self.statsHandler)
+        userContent.add(self, name: Self.logHandler)
         // The bundled 4LD loader has its own click-to-start overlay and tries
         // to use the Fullscreen API. Neither applies inside a native app.
         userContent.addUserScript(WKUserScript(
@@ -98,6 +124,7 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         ))
         userContent.addUserScript(WebBridge.speedScript(initialSpeed: self.config.gameSpeed))
         userContent.addUserScript(WebBridge.statsScript())
+        userContent.addUserScript(WebBridge.diagnosticScript())
 
         // Stop Safari-style scrolling / zoom / callouts on the game canvas.
         let css = "html,body{margin:0;padding:0;overflow:hidden;touch-action:none;" +
@@ -190,11 +217,22 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
 
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
-        guard message.name == Self.statsHandler,
-              let body = message.body as? [String: Any],
-              let fps = (body["fps"] as? NSNumber)?.intValue else { return }
-        currentFPS = fps
-        if !hudLabel.isHidden { refreshHUDText() }
+        switch message.name {
+        case Self.statsHandler:
+            guard let body = message.body as? [String: Any],
+                  let fps = (body["fps"] as? NSNumber)?.intValue else { return }
+            currentFPS = fps
+            if !hudLabel.isHidden { refreshHUDText() }
+
+        case Self.logHandler:
+            guard let body = message.body as? [String: Any] else { return }
+            let level = body["level"] as? String ?? "LOG"
+            let text = body["message"] as? String ?? String(describing: message.body)
+            DiagnosticLog.shared.add(text, level: "JS.\(level)", source: "web")
+
+        default:
+            break
+        }
     }
 
     // MARK: - Game speed
@@ -240,7 +278,13 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         button.heightAnchor.constraint(equalToConstant: 54).isActive = true
         button.addTarget(self, action: #selector(startTapped), for: .touchUpInside)
 
-        let stack = UIStackView(arrangedSubviews: [title, subtitle, button, note])
+        let logButton = UIButton(type: .system)
+        logButton.setTitle("Export Error Log", for: .normal)
+        logButton.titleLabel?.font = .systemFont(ofSize: 12)
+        logButton.tintColor = UIColor(white: 0.65, alpha: 1)
+        logButton.addTarget(self, action: #selector(exportLogTapped), for: .touchUpInside)
+
+        let stack = UIStackView(arrangedSubviews: [title, subtitle, button, note, logButton])
         stack.axis = .vertical
         stack.alignment = .center
         stack.spacing = 18
@@ -268,9 +312,20 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         startGame()
     }
 
+    @objc private func exportLogTapped() {
+        DiagnosticLog.shared.add("error log exported from intro", source: "ui")
+        let inspector = InspectViewController(
+            text: DiagnosticLog.shared.currentText(),
+            title: "Error Log",
+            fileURL: DiagnosticLog.shared.exportFileURL()
+        )
+        present(UINavigationController(rootViewController: inspector), animated: true)
+    }
+
     private func startGame() {
         guard !didStart else { return }
         didStart = true
+        DiagnosticLog.shared.add("TAP TO START pressed", source: "ui")
 
         intro.removeFromSuperview()
         overlay.isHidden = false
@@ -377,7 +432,7 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
                 WebBridge.inspect(self.webView) { text in
                     DispatchQueue.main.async {
                         navigation.pushViewController(
-                            InspectViewController(text: text),
+                            InspectViewController(text: text, title: "Page Inspect"),
                             animated: true
                         )
                     }
@@ -427,9 +482,30 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         } else if scheme == "https" && navigationAction.targetFrame?.isMainFrame != true {
             decisionHandler(.allow)
         } else {
-            NSLog("[fb3] blocked external navigation: %@", url.absoluteString)
+            let message = "blocked external navigation: \(url.absoluteString)"
+            NSLog("[fb3] %@", message)
+            DiagnosticLog.shared.add(message, level: "WARN", source: "nav")
             decisionHandler(.cancel)
         }
+    }
+
+    func webView(_ webView: WKWebView,
+                 didFailProvisionalNavigation navigation: WKNavigation!,
+                 withError error: Error) {
+        DiagnosticLog.shared.add("provisional navigation failed: \(error.localizedDescription)",
+                                 level: "ERROR", source: "nav")
+    }
+
+    func webView(_ webView: WKWebView,
+                 didFail navigation: WKNavigation!,
+                 withError error: Error) {
+        DiagnosticLog.shared.add("navigation failed: \(error.localizedDescription)",
+                                 level: "ERROR", source: "nav")
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        DiagnosticLog.shared.add("navigation finished: \(webView.url?.absoluteString ?? "?")",
+                                 source: "nav")
     }
 
     // MARK: - Lifecycle
@@ -451,11 +527,13 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
 
     @objc private func willResign() {
         guard didStart else { return }
+        DiagnosticLog.shared.add("app backgrounded", source: "ui")
         WebBridge.pause(webView)
     }
 
     @objc private func didBecome() {
         guard didStart else { return }
+        DiagnosticLog.shared.add("app foregrounded", source: "ui")
         paused = false
         WebBridge.resume(webView)
     }

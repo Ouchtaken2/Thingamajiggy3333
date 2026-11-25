@@ -52,7 +52,7 @@ jobs:
           test -f Payload/Frickbears3iOS.app/Game/index.html
           grep -q "manifestFiles" Payload/Frickbears3iOS.app/Game/index.html
           for f in runner.js runner.wasm runner.data audio-worklet.js game.unx \
-                   manifest.webmanifest icon-192.png runner.svg \
+                   manifest.webmanifest icon-192.png runner.svg runnerLocal.svg \
                    display_mouse_lock.js NekoPresence.js; do
             test -f "Payload/Frickbears3iOS.app/Game/$f"
           done

@@ -61,13 +61,25 @@ enum WebBridge {
 
     /// Must be called from a real user gesture: unlocks WebAudio and focuses
     /// the canvas so subsequent synthetic keys land on the right element.
+    /// The page can still be booting when this fires, so keep retrying until
+    /// the runner's helpers exist instead of missing them once.
     static func start(_ webView: WKWebView) {
         let js = """
         (function(){
           var c=document.getElementById('canvas');
           if (c && c.focus) { c.focus(); }
-          if (window.__fb3_unlockAudio) { window.__fb3_unlockAudio(); }
-          if (window.__fb3_revealCanvas) { window.__fb3_revealCanvas(); }
+          var tries = 0;
+          var announced = false;
+          var timer = setInterval(function(){
+            var ready = !!(window.__fb3_unlockAudio || window.__fb3_revealCanvas);
+            if (ready && !announced) {
+              announced = true;
+              if (window.__fb3Log) window.__fb3Log('INFO', 'audio/canvas unlock helpers ready after ' + tries + ' retries');
+            }
+            if (window.__fb3_unlockAudio) { window.__fb3_unlockAudio(); }
+            if (window.__fb3_revealCanvas) { window.__fb3_revealCanvas(); }
+            if (++tries > 1200) clearInterval(timer);
+          }, 25);
         })();
         """
         webView.evaluateJavaScript(js, completionHandler: nil)
@@ -149,6 +161,121 @@ enum WebBridge {
             requestAnimationFrame(loop);
           }
           requestAnimationFrame(loop);
+        })();
+        """
+        return WKUserScript(source: js, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+    }
+
+    /// Captures JS console output, page errors, failed network requests and
+    /// loading-progress changes into the native diagnostic log.
+    static func diagnosticScript() -> WKUserScript {
+        let js = """
+        (function(){
+          function send(level, msg){
+            var text = String(msg == null ? '' : msg);
+            if (text.length > 4000) text = text.slice(0, 4000) + '…';
+            try {
+              if (window.webkit && window.webkit.messageHandlers &&
+                  window.webkit.messageHandlers.fb3log) {
+                window.webkit.messageHandlers.fb3log.postMessage({
+                  level: String(level), message: text
+                });
+              }
+            } catch (e) {}
+          }
+          window.__fb3Log = send;
+
+          function argsToText(args){
+            var out = [];
+            for (var i = 0; i < args.length; i++) {
+              var v = args[i];
+              if (v instanceof Error) {
+                out.push(v.stack || (v.name + ': ' + v.message));
+              } else if (typeof v === 'object') {
+                try { out.push(JSON.stringify(v)); } catch (e) { out.push(String(v)); }
+              } else {
+                out.push(String(v));
+              }
+            }
+            return out.join(' ');
+          }
+
+          ['log', 'warn', 'error'].forEach(function(level){
+            var original = console[level];
+            console[level] = function(){
+              send(level.toUpperCase(), argsToText(arguments));
+              try { return original.apply(console, arguments); } catch (e) {}
+            };
+          });
+
+          window.addEventListener('error', function(e){
+            send('ERROR', 'window.error: ' + (e.message || '') + ' @ ' +
+              (e.filename || '') + ':' + (e.lineno || 0) + ':' + (e.colno || 0) +
+              (e.error && e.error.stack ? '\\n' + e.error.stack : ''));
+          }, true);
+          window.addEventListener('unhandledrejection', function(e){
+            var r = e.reason;
+            send('ERROR', 'unhandledrejection: ' + ((r && r.stack) || String(r)));
+          });
+
+          var originalFetch = window.fetch;
+          if (typeof originalFetch === 'function') {
+            window.fetch = function(input, init){
+              var url = typeof input === 'string' ? input : ((input && input.url) || String(input));
+              send('FETCH', 'start ' + url);
+              return originalFetch.apply(this, arguments).then(function(resp){
+                send('FETCH', 'ok ' + resp.status + ' ' + url);
+                return resp;
+              }, function(err){
+                send('ERROR', 'fetch failed ' + url + ' :: ' + ((err && err.message) || err));
+                throw err;
+              });
+            };
+          }
+
+          var originalOpen = XMLHttpRequest.prototype.open;
+          var originalSend = XMLHttpRequest.prototype.send;
+          XMLHttpRequest.prototype.open = function(method, url){
+            this.__fb3url = url;
+            return originalOpen.apply(this, arguments);
+          };
+          XMLHttpRequest.prototype.send = function(){
+            var self = this;
+            self.addEventListener('load', function(){
+              send('XHR', 'load ' + self.status + ' ' + self.__fb3url);
+            });
+            self.addEventListener('error', function(){
+              send('ERROR', 'xhr error ' + self.__fb3url);
+            });
+            self.addEventListener('timeout', function(){
+              send('ERROR', 'xhr timeout ' + self.__fb3url);
+            });
+            return originalSend.apply(this, arguments);
+          };
+
+          var lastSignal = '';
+          var bootAt = Date.now();
+          var stuckWarned = false;
+          setInterval(function(){
+            var s = document.getElementById('status');
+            var text = s ? String(s.textContent || s.innerText || '').replace(/\\s+/g, ' ').trim() : '(no #status)';
+            var seconds = Math.round((Date.now() - bootAt) / 1000);
+            if (!stuckWarned && seconds > 120 && /Preparing|Downloading|Loading/i.test(text)) {
+              stuckWarned = true;
+              send('WARN', 'still loading after ' + seconds + 's: ' + text);
+            }
+            var p = document.getElementById('progress');
+            var pct = p && p.max ? Math.round(100 * Number(p.value) / Number(p.max)) : null;
+            var left = window.__fb3_run_left;
+            var total = window.__fb3_run_total;
+            var signal = text + '|' + pct + '|' + left + '|' + total;
+            if (signal !== lastSignal) {
+              lastSignal = signal;
+              send('STATUS', text + (pct !== null ? ' ' + pct + '%' : '') +
+                ' deps=' + (left === undefined ? '-' : left) + '/' +
+                (total === undefined ? '-' : total));
+            }
+          }, 1000);
         })();
         """
         return WKUserScript(source: js, injectionTime: .atDocumentStart, forMainFrameOnly: true)
