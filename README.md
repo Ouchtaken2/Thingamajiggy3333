@@ -118,9 +118,12 @@ All options are saved on the device instantly — **no rebuild required**.
 - **Mods** — toggles for future JSON/asset-override mods. No mod loader is
   active in the current web shell yet.
 - **Inspect Page** — dump of what the web view is actually rendering.
-- **Export Error Log** — share the captured JS/native diagnostic log. It can
-  also be found as `frickbears3-diagnostic.log` in the app's Documents folder
-  (visible in the iOS Files app). Use this if loading hangs.
+- **Export Error Log** — opens the captured JS/native log in portrait. Use
+  **Copy** to put the whole log on the clipboard, **Save to Files** for the
+  `.log` file directly, or **Share** for both. **Landscape / Portrait** flips
+  the viewer if you want to rotate it. It can also be found as
+  `frickbears3-diagnostic.log` in the app's Documents folder (visible in the
+  iOS Files app). Use this if loading hangs.
 - **Reset All** (top right) restores every option and all key mappings.
 
 ## Native port assets
@@ -149,6 +152,11 @@ are the foundation for the true native port.
 - **Stuck at 88% / "Preparing... (7/8)"** — tap **TAP TO START** first if you
   have not, then wait a little. If it still hangs, tap **Export Error Log** on
   the intro screen or **⚙ → Diagnostics → Export Error Log** and send the log.
+- **Log shows no request for `runner.js` / `runner.wasm`** — fixed in this
+  build. The CDN's host-redirect script also injected `runner.js`; stripping it
+  previously removed the runtime. The build script now replaces it with a local
+  `<script src="runner.js">`, and the app loads from `fb3://localhost` so even
+  an unstripped future variant will take the safe path.
 - **First launch takes a long time** — the app reads the bundled 46 MB game
   from the IPA; no internet is needed. Audio may stay muted until the first tap.
 - **Black screen after TAP TO START** — the device may be low on RAM.

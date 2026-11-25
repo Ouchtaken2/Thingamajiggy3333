@@ -86,17 +86,28 @@ enum WebBridge {
     }
 
     static func pause(_ webView: WKWebView) {
-        webView.evaluateJavaScript(
-            "if(typeof pause==='function'){pause();}else if(typeof GM_pause==='function'){GM_pause();}",
-            completionHandler: nil
-        )
+        // The page's pause() calls GM_pause() unconditionally. Early on (or on
+        // a fast background/resign event) the engine is not defined yet, so
+        // guard on the engine function before calling either entry point.
+        let js = """
+        (function(){
+          if (typeof GM_pause !== 'function') return;
+          if (typeof pause === 'function') { pause(); }
+          else { GM_pause(); }
+        })();
+        """
+        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
     static func resume(_ webView: WKWebView) {
-        webView.evaluateJavaScript(
-            "if(typeof resume==='function'){resume();}else if(typeof GM_unpause==='function'){GM_unpause();}",
-            completionHandler: nil
-        )
+        let js = """
+        (function(){
+          if (typeof GM_unpause !== 'function') return;
+          if (typeof resume === 'function') { resume(); }
+          else { GM_unpause(); }
+        })();
+        """
+        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
     /// EXPERIMENTAL: there is no official speed API in the runner. This feeds

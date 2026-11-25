@@ -202,14 +202,14 @@ final class SettingsViewController: UITableViewController {
             onInspect?()
         case (2, 3):
             DiagnosticLog.shared.add("error log exported from settings", source: "ui")
-            navigationController?.pushViewController(
-                InspectViewController(
-                    text: DiagnosticLog.shared.currentText(),
-                    title: "Error Log",
-                    fileURL: DiagnosticLog.shared.exportFileURL()
-                ),
-                animated: true
+            let inspector = InspectViewController(
+                text: DiagnosticLog.shared.currentText(),
+                title: "Error Log",
+                fileURL: DiagnosticLog.shared.exportFileURL()
             )
+            let navigation = InspectNavigationController(rootViewController: inspector)
+            navigation.modalPresentationStyle = .overFullScreen
+            present(navigation, animated: true)
         case (3, 0):
             let schemes = FredsweeperTouchScheme.allCases
             let current = schemes.firstIndex(of: config.fredsweeperScheme) ?? 0
@@ -542,14 +542,61 @@ final class ProfileDetailViewController: UITableViewController {
     }
 }
 
-// MARK: - Page inspector
+// MARK: - Page inspector / error log
 
-/// Read-only, shareable dump of the live WKWebView page. This is purely a
-/// troubleshooting aid — it reports what the browser is actually rendering.
+/// Wrapper that lets the diagnostic screen use portrait even though the game
+/// itself is landscape-locked. Portrait makes iOS's share sheet (including
+/// "Save to Files") fully visible on small screens.
+final class InspectNavigationController: UINavigationController {
+    private(set) var portraitAllowed = true
+
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        portraitAllowed ? .all : .landscape
+    }
+
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
+        portraitAllowed ? .portrait : .landscapeLeft
+    }
+
+    func usePortrait(_ portrait: Bool) {
+        portraitAllowed = portrait
+        if #available(iOS 16.0, *) {
+            setNeedsUpdateOfSupportedInterfaceOrientations()
+            view.window?.windowScene?.requestGeometryUpdate(
+                .iOS(interfaceOrientations: portrait ? .portrait : .landscape)
+            )
+        } else {
+            UIDevice.current.setValue(
+                portrait ? UIInterfaceOrientation.portrait.rawValue
+                         : UIInterfaceOrientation.landscapeLeft.rawValue,
+                forKey: "orientation"
+            )
+            UIViewController.attemptRotationToDeviceOrientation()
+        }
+    }
+}
+
+/// Read-only, shareable dump of the live WKWebView page or the native log.
+/// Includes explicit Copy / Save to Files / Rotate controls because the iOS
+/// share sheet alone is easy to miss in landscape.
 final class InspectViewController: UIViewController {
 
     private let text: String
     private let fileURL: URL?
+    private var portrait = true
+
+    private lazy var copyButton = UIBarButtonItem(
+        title: "Copy", style: .plain, target: self, action: #selector(copyTapped)
+    )
+    private lazy var shareButton = UIBarButtonItem(
+        barButtonSystemItem: .action, target: self, action: #selector(shareTapped)
+    )
+    private lazy var rotateButton = UIBarButtonItem(
+        title: "Landscape", style: .plain, target: self, action: #selector(rotateTapped)
+    )
+    private lazy var saveFileButton = UIBarButtonItem(
+        title: "Save to Files", style: .plain, target: self, action: #selector(saveFilesTapped)
+    )
 
     init(text: String, title: String = "Page Inspect", fileURL: URL? = nil) {
         self.text = text
@@ -576,11 +623,16 @@ final class InspectViewController: UIViewController {
                 action: #selector(doneTapped)
             )
         }
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            barButtonSystemItem: .action,
-            target: self,
-            action: #selector(shareTapped)
-        )
+        navigationItem.rightBarButtonItems = [shareButton, copyButton]
+
+        var toolbarItems: [UIBarButtonItem] = [rotateButton]
+        if fileURL != nil {
+            toolbarItems += [
+                UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
+                saveFileButton
+            ]
+        }
+        self.toolbarItems = toolbarItems
 
         let textView = UITextView()
         textView.translatesAutoresizingMaskIntoConstraints = false
@@ -597,15 +649,60 @@ final class InspectViewController: UIViewController {
         ])
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setToolbarHidden(false, animated: animated)
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if let navigation = navigationController as? InspectNavigationController {
+            navigation.usePortrait(portrait)
+        }
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.setToolbarHidden(true, animated: animated)
+    }
+
+    private func updateRotateButton() {
+        rotateButton.title = portrait ? "Landscape" : "Portrait"
+    }
+
     @objc private func doneTapped() {
         dismiss(animated: true)
+    }
+
+    @objc private func rotateTapped() {
+        portrait.toggle()
+        updateRotateButton()
+        (navigationController as? InspectNavigationController)?.usePortrait(portrait)
+    }
+
+    @objc private func copyTapped() {
+        UIPasteboard.general.string = text
+        let alert = UIAlertController(
+            title: "Copied",
+            message: "The full log is on your clipboard.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
+    @objc private func saveFilesTapped() {
+        guard let fileURL else { return }
+        let activity = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+        activity.popoverPresentationController?.barButtonItem = saveFileButton
+        present(activity, animated: true)
     }
 
     @objc private func shareTapped() {
         var items: [Any] = [text]
         if let fileURL { items.append(fileURL) }
         let activity = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        activity.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItem
+        activity.popoverPresentationController?.barButtonItem = shareButton
         present(activity, animated: true)
     }
 }

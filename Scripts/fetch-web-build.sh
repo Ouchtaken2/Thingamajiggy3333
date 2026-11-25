@@ -21,8 +21,11 @@ curl -fsSL --retry 3 --retry-delay 1 \
 
 # The CDN page contains an obfuscated host/referrer check that replaces the
 # document with a "Play ... on playfrickbears.com" link unless it is loaded
-# from cdn.gachaplay.online with a playfrickbears.com referrer. Our app loads
-# it from fb3://local, so that script must be stripped before bundling.
+# from cdn.gachaplay.online with a playfrickbears.com referrer. That same script
+# is also the only thing that injects runner.js, so stripping it must replace
+# the injection with a plain local <script src="runner.js"></script>. The app
+# additionally loads from fb3://localhost, which the original check accepts as
+# a safe host if the strip ever misses a future obfuscated variant.
 python3 - "$DEST/index.html" <<'PY'
 import re
 import sys
@@ -52,7 +55,13 @@ def scrub_full(match):
     )
     if is_redirect:
         removed.append(len(body))
-        return match.group(1) + "/* removed host-redirect script */" + match.group(3)
+        # This script is a two-in-one: it redirects off-host, but on an allowed
+        # host it is also what appends <script src="runner.js">. Keep the
+        # loader, drop only the redirect.
+        return (
+            "<!-- removed host-redirect script -->\n"
+            '<script src="runner.js"></script>'
+        )
     return match.group(0)
 
 cleaned = re.sub(r"(<script[^>]*>)([\s\S]*?)(</script>)", scrub_full, html)
@@ -97,6 +106,12 @@ files += [
     "runner.svg",
     "display_mouse_lock.js",
     "NekoPresence.js",
+    # Loaded dynamically by the in-page office HUD, not listed in the manifest.
+    "fb3_office_hud/sOfficeWallOutside.png",
+    "fb3_office_hud/sDoor.png",
+    "fb3_office_hud/sCameraViews_0.png",
+    "fb3_office_hud/sCameraUI.png",
+    "fb3_office_hud/sCamButton.png",
 ]
 
 # runnerLocal.svg does not exist on the CDN; bundle a copy locally so the

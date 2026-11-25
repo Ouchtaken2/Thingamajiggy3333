@@ -164,7 +164,10 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         ])
         self.webView = webView
 
-        webView.load(URLRequest(url: URL(string: "\(Self.scheme)://local/index.html")!))
+        // "localhost" is on the CDN loader's allow-list. If the build-time
+        // redirect strip ever misses a variant, the original script will still
+        // inject runner.js instead of replacing the page with a web link.
+        webView.load(URLRequest(url: URL(string: "\(Self.scheme)://localhost/index.html")!))
     }
 
     // MARK: - Stats
@@ -319,7 +322,9 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
             title: "Error Log",
             fileURL: DiagnosticLog.shared.exportFileURL()
         )
-        present(UINavigationController(rootViewController: inspector), animated: true)
+        let navigation = InspectNavigationController(rootViewController: inspector)
+        navigation.modalPresentationStyle = .overFullScreen
+        present(navigation, animated: true)
     }
 
     private func startGame() {
@@ -431,10 +436,10 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
                 guard let self, let navigation else { return }
                 WebBridge.inspect(self.webView) { text in
                     DispatchQueue.main.async {
-                        navigation.pushViewController(
-                            InspectViewController(text: text, title: "Page Inspect"),
-                            animated: true
-                        )
+                        let inspector = InspectViewController(text: text, title: "Page Inspect")
+                        let logNavigation = InspectNavigationController(rootViewController: inspector)
+                        logNavigation.modalPresentationStyle = .overFullScreen
+                        navigation.present(logNavigation, animated: true)
                     }
                 }
             }

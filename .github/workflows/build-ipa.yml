@@ -56,6 +56,10 @@ jobs:
                    display_mouse_lock.js NekoPresence.js; do
             test -f "Payload/Frickbears3iOS.app/Game/$f"
           done
+          for f in sOfficeWallOutside.png sDoor.png sCameraViews_0.png \
+                   sCameraUI.png sCamButton.png; do
+            test -f "Payload/Frickbears3iOS.app/Game/fb3_office_hud/$f"
+          done
           test -f Payload/Frickbears3iOS.app/PortAssets/manifest.json
 
           du -sh Payload/Frickbears3iOS.app/Game
