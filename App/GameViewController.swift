@@ -102,7 +102,12 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         // Stop Safari-style scrolling / zoom / callouts on the game canvas.
         let css = "html,body{margin:0;padding:0;overflow:hidden;touch-action:none;" +
                   "-webkit-user-select:none;user-select:none}" +
-                  "canvas{touch-action:none;-webkit-touch-callout:none}"
+                  "canvas{touch-action:none;-webkit-touch-callout:none}" +
+                  // Hide the web runner's debug chrome. None of it is useful
+                  // in the native shell, and its buttons look like links.
+                  ".floating-control,.output-container,.wallpaper-container," +
+                  "#message-container,#pauseMenuContainer,#QRCode,#QR2Code{" +
+                  "display:none!important}"
         let cssScript = WKUserScript(
             source: "var s=document.createElement('style');s.textContent='\(css)';" +
                     "(document.head||document.documentElement).appendChild(s);",
@@ -213,7 +218,7 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         title.numberOfLines = 0
 
         let subtitle = UILabel()
-        subtitle.text = "Unofficial iOS wrapper • Fan-made • Landscape\nInternet required on first launch (several hundred MB)"
+        subtitle.text = "Unofficial iOS wrapper • Fan-made • Landscape\nFull game bundled — works offline"
         subtitle.textColor = UIColor(white: 0.75, alpha: 1)
         subtitle.font = .systemFont(ofSize: 13)
         subtitle.textAlignment = .center

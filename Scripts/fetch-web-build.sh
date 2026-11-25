@@ -19,6 +19,53 @@ curl -fsSL --retry 3 --retry-delay 1 \
   -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36" \
   "$BASE/index.html" -o "$DEST/index.html"
 
+# The CDN page contains an obfuscated host/referrer check that replaces the
+# document with a "Play ... on playfrickbears.com" link unless it is loaded
+# from cdn.gachaplay.online with a playfrickbears.com referrer. Our app loads
+# it from fb3://local, so that script must be stripped before bundling.
+python3 - "$DEST/index.html" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as handle:
+    html = handle.read()
+
+removed = []
+
+# Keep the opening/closing tags around a comment so the HTML stays valid.
+def scrub_full(match):
+    body = match.group(2)
+    # The obfuscator renames every identifier on each CDN request, so match
+    # the script's shape: a small decoder block with a base64 string table,
+    # a rotation loop, and reads of navigator/document/window/location.
+    is_redirect = (
+        "function _0xc1bb(" in body
+        or "__pfb" in body
+        or "playfrickbears.com" in body
+        or (
+            4000 <= len(body) <= 12000
+            and "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=" in body
+            and "while(!![])" in body
+            and all(token in body for token in ("navigator", "document", "window", "location"))
+        )
+    )
+    if is_redirect:
+        removed.append(len(body))
+        return match.group(1) + "/* removed host-redirect script */" + match.group(3)
+    return match.group(0)
+
+cleaned = re.sub(r"(<script[^>]*>)([\s\S]*?)(</script>)", scrub_full, html)
+
+with open(path, "w", encoding="utf-8", newline="") as handle:
+    handle.write(cleaned)
+
+if removed:
+    print("==> Removed %d host-redirect script(s) (%d chars)" % (len(removed), sum(removed)))
+else:
+    print("==> WARNING: no host-redirect script found; verify index.html manually")
+PY
+
 echo "==> Resolving file list from manifestFiles()"
 python3 - "$DEST/index.html" "$BASE" "$DEST" <<'PY'
 import os

@@ -156,13 +156,17 @@ final class TouchControlOverlay: UIView {
         NSLayoutConstraint.activate([
             width,
             height,
+            // Use multipliers against the overlay's own bounds. Multiplying
+            // UIScreen.main.bounds at build time breaks in landscape: the
+            // screen reports portrait dimensions before layout settles and
+            // every control ends up crammed near the centre.
             button.centerXAnchor.constraint(
                 equalTo: centerXAnchor,
-                constant: x * UIScreen.main.bounds.width
+                multiplier: 1 + 2 * x
             ),
             button.centerYAnchor.constraint(
                 equalTo: centerYAnchor,
-                constant: y * UIScreen.main.bounds.height
+                multiplier: 1 + 2 * y
             )
         ])
 

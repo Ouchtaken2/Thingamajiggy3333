@@ -20,8 +20,10 @@ audio — no internet is needed on the iPhone.
 
 > **Offline at launch.** All game files are bundled into the app and served
 > locally through `fb3://`. Internet is only needed when building the IPA in
-> the cloud. Saves live in the app's own WebKit storage, not in the IPA —
-> deleting the app deletes your saves.
+> the cloud. The build step also strips a host/referrer redirect script that
+> the CDN page would otherwise use to replace the game with a
+> `playfrickbears.com` link. Saves live in the app's own WebKit storage, not in
+> the IPA — deleting the app deletes your saves.
 
 > Personal, non-commercial use only. See [CREDITS.md](CREDITS.md).
 
