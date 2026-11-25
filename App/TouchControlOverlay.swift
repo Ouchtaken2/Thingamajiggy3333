@@ -153,22 +153,26 @@ final class TouchControlOverlay: UIView {
 
         let width = button.widthAnchor.constraint(equalToConstant: size)
         let height = button.heightAnchor.constraint(equalToConstant: size)
-        NSLayoutConstraint.activate([
-            width,
-            height,
-            // Use multipliers against the overlay's own bounds. Multiplying
-            // UIScreen.main.bounds at build time breaks in landscape: the
-            // screen reports portrait dimensions before layout settles and
-            // every control ends up crammed near the centre.
-            button.centerXAnchor.constraint(
-                equalTo: centerXAnchor,
-                multiplier: 1 + 2 * x
-            ),
-            button.centerYAnchor.constraint(
-                equalTo: centerYAnchor,
-                multiplier: 1 + 2 * y
-            )
-        ])
+
+        // Use multipliers against the overlay's own centre. Multiplying
+        // UIScreen.main.bounds at build time breaks in landscape: the screen
+        // reports portrait dimensions before layout settles and every control
+        // ends up crammed near the centre. The item-based NSLayoutConstraint
+        // API is used because NSLayoutYAxisAnchor has no public
+        // constraint(equalTo:multiplier:) overload.
+        let centerX = NSLayoutConstraint(
+            item: button, attribute: .centerX,
+            relatedBy: .equal,
+            toItem: self, attribute: .centerX,
+            multiplier: 1 + 2 * x, constant: 0
+        )
+        let centerY = NSLayoutConstraint(
+            item: button, attribute: .centerY,
+            relatedBy: .equal,
+            toItem: self, attribute: .centerY,
+            multiplier: 1 + 2 * y, constant: 0
+        )
+        NSLayoutConstraint.activate([width, height, centerX, centerY])
 
         sizedControls.append(SizedControl(
             view: button,
