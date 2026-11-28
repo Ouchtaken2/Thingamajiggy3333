@@ -57,16 +57,25 @@ final class PortManifestStore {
         let manifestURL = bundle.url(forResource: "manifest", withExtension: "json", subdirectory: "PortAssets")
             ?? bundle.url(forResource: "PortAssets/manifest", withExtension: "json")
 
-        guard let manifestURL,
-              let data = try? Data(contentsOf: manifestURL),
-              let decoded = try? JSONDecoder().decode(PortManifest.self, from: data) else {
+        guard let manifestURL else {
+            DiagnosticLog.shared.add("PortAssets/manifest.json not found in bundle",
+                                     level: "ERROR", source: "native")
             self.manifest = nil
             self.rootURL = nil
             return
         }
 
-        self.manifest = decoded
-        self.rootURL = manifestURL.deletingLastPathComponent()
+        do {
+            let data = try Data(contentsOf: manifestURL)
+            let decoded = try JSONDecoder().decode(PortManifest.self, from: data)
+            self.manifest = decoded
+            self.rootURL = manifestURL.deletingLastPathComponent()
+        } catch {
+            DiagnosticLog.shared.add("PortAssets manifest load failed: \(error)",
+                                     level: "ERROR", source: "native")
+            self.manifest = nil
+            self.rootURL = nil
+        }
     }
 
     func minigame(_ id: String) -> PortMinigame? {

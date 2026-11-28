@@ -29,6 +29,7 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
 
     private var didStart = false
     private var paused = false
+    private var nativeDemoActive = false
 
     private let config = AppConfigStore.shared
 
@@ -281,13 +282,22 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         button.heightAnchor.constraint(equalToConstant: 54).isActive = true
         button.addTarget(self, action: #selector(startTapped), for: .touchUpInside)
 
+        let nativeButton = UIButton(type: .system)
+        nativeButton.setTitle("NATIVE 2.2 MINIGAME DEMO", for: .normal)
+        nativeButton.titleLabel?.font = .boldSystemFont(ofSize: 12)
+        nativeButton.tintColor = UIColor(white: 0.85, alpha: 1)
+        nativeButton.backgroundColor = UIColor.white.withAlphaComponent(0.10)
+        nativeButton.layer.cornerRadius = 7
+        nativeButton.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        nativeButton.addTarget(self, action: #selector(openNativeDemo), for: .touchUpInside)
+
         let logButton = UIButton(type: .system)
         logButton.setTitle("Export Error Log", for: .normal)
         logButton.titleLabel?.font = .systemFont(ofSize: 12)
         logButton.tintColor = UIColor(white: 0.65, alpha: 1)
         logButton.addTarget(self, action: #selector(exportLogTapped), for: .touchUpInside)
 
-        let stack = UIStackView(arrangedSubviews: [title, subtitle, button, note, logButton])
+        let stack = UIStackView(arrangedSubviews: [title, subtitle, button, nativeButton, note, logButton])
         stack.axis = .vertical
         stack.alignment = .center
         stack.spacing = 18
@@ -325,6 +335,28 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
         let navigation = InspectNavigationController(rootViewController: inspector)
         navigation.modalPresentationStyle = .overFullScreen
         present(navigation, animated: true)
+    }
+
+    /// Native 2.2 asset demo. The shipped app is still the complete 2.1.5 web
+    /// build; this screen previews the first native minigame without changing
+    /// the version label or touching the bundled game.
+    @objc private func openNativeDemo() {
+        if didStart {
+            WebBridge.pause(webView)
+        }
+        nativeDemoActive = true
+        DiagnosticLog.shared.add("native 2.2 Fredsweeper demo opened", source: "ui")
+
+        let demo = FredsweeperViewController()
+        demo.modalPresentationStyle = .overFullScreen
+        demo.onDismiss = { [weak self] in
+            guard let self else { return }
+            self.nativeDemoActive = false
+            if self.didStart && !self.paused {
+                WebBridge.resume(self.webView)
+            }
+        }
+        present(demo, animated: true)
     }
 
     private func startGame() {
@@ -453,6 +485,11 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
             self.applyZoom()
         }
 
+        overlay.onNativeDemo = { [weak self] in
+            guard let self, self.didStart else { return }
+            self.openNativeDemo()
+        }
+
         overlay.onMouseModeChanged = { [weak self] enabled in
             guard let self else { return }
             self.mouseEnabled = enabled
@@ -533,12 +570,20 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
     @objc private func willResign() {
         guard didStart else { return }
         DiagnosticLog.shared.add("app backgrounded", source: "ui")
+        if nativeDemoActive {
+            (presentedViewController as? FredsweeperViewController)?.gameViewSuspend()
+            return
+        }
         WebBridge.pause(webView)
     }
 
     @objc private func didBecome() {
         guard didStart else { return }
         DiagnosticLog.shared.add("app foregrounded", source: "ui")
+        if nativeDemoActive {
+            (presentedViewController as? FredsweeperViewController)?.gameViewResume()
+            return
+        }
         paused = false
         WebBridge.resume(webView)
     }

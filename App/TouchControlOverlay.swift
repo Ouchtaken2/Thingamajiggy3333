@@ -9,6 +9,7 @@ final class TouchControlOverlay: UIView {
     var onPauseToggle: (() -> Void)?
     var onSettings: (() -> Void)?
     var onZoomToggle: (() -> Void)?
+    var onNativeDemo: (() -> Void)?
 
     private var actionButtons: [ActionButton] = []
     private var sizedControls: [SizedControl] = []
@@ -97,6 +98,9 @@ final class TouchControlOverlay: UIView {
         // Utilities
         place(utilityButton("II") { [weak self] in self?.onPauseToggle?() },
               x: -0.44, y: -0.45, size: 38)
+
+        place(utilityButton("2.2 DEMO") { [weak self] in self?.onNativeDemo?() },
+              x: -0.22, y: -0.45, size: 74)
 
         place(utilityButton("⚙") { [weak self] in self?.onSettings?() },
               x: 0.0, y: -0.45, size: 38)

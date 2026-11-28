@@ -34,7 +34,10 @@ The public web port still serves the old **2.1.5** build, so the IPA you can
 build today remains honestly labelled 2.1.5 — it is **not** relabelled as 2.2.
 A true native 2.2 refresh is being assembled from the recovered 2.2.2
 `data.win`; its curated assets are described under
-[Native port assets](#native-port-assets).
+[Native port assets](#native-port-assets). The first native milestone is a
+Fredsweeper renderer using those assets. It is available as the
+**2.2 DEMO** button on the intro screen and the controls overlay; the rest of
+the app is still the complete 2.1.5 web game.
 
 ---
 
@@ -94,6 +97,7 @@ not delete the app.
 | Y | Tab |
 | L / R | Q / F |
 | II | Pause / resume |
+| 2.2 DEMO | Open the native Fredsweeper demo (2.2 assets) |
 | ⚙ | Open Settings |
 | 🔍 1× | Cycle game zoom: 1× → 2× → 3× → 1× |
 | MOUSE: ON | Tap anywhere to send mouse clicks to the game |
@@ -165,6 +169,16 @@ If the exports already exist, just refresh the curated copy:
 The current IPA bundles the full web loader, so it works offline. These assets
 are the foundation for the true native 2.2 port; they do not change the shipped
 web build's version.
+
+`App/FredsweeperModel.swift`, `FredsweeperView.swift` and
+`FredsweeperViewController.swift` are the first native slice: a CoreGraphics
+renderer for both Fredsweeper boards that reads `manifest.json` at runtime,
+uses the recovered tile/font frames, honours the configured touch scheme and
+board scale, and ports the custom `Code/Reference` board logic (safe first
+click, flood fill, flags, chord preview and win/death reset). It is exposed as
+the **2.2 DEMO** button; the underlying web game is paused while it is open.
+The bundled `.ogg` effects are indexed but not played yet, so this milestone
+uses haptics only.
 
 ---
 
