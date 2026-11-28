@@ -27,6 +27,15 @@ audio — no internet is needed on the iPhone.
 
 > Personal, non-commercial use only. See [CREDITS.md](CREDITS.md).
 
+### Version status
+
+The official PC release is **2.2** (four new animatronics and skin modding).
+The public web port still serves the old **2.1.5** build, so the IPA you can
+build today remains honestly labelled 2.1.5 — it is **not** relabelled as 2.2.
+A true native 2.2 refresh is being assembled from the recovered 2.2.2
+`data.win`; its curated assets are described under
+[Native port assets](#native-port-assets).
+
 ---
 
 ## Build & install (no Mac required)
@@ -128,22 +137,34 @@ All options are saved on the device instantly — **no rebuild required**.
 
 ## Native port assets
 
-`PortAssets/` contains a curated, tiny slice of the recovered GameMaker dump:
+`PortAssets/` contains a curated, tiny slice of the recovered GameMaker dump,
+refreshed from the **2.2.2** package (`../frickbears3-4ld-v2.2.2`):
 
 - `manifest.json` — logical asset index and board constants
-- `Code/Reference/` — decompiled Fredsweeper/minigame GML for reference
+- `Code/Reference/` — Fredsweeper/minigame GML **with the iOS touch edits**;
+  this is the native port's source of truth and is never overwritten
+- `Code/Vanilla-2.2.2/` — pristine 2.2.2 decompilation of the same seven code
+  entries, for comparison only (see `Code/README.md`)
 - `Fredsweeper/` — tile sprites, font frames and three SFX
-- `Rooms/` — office/minigame room images
+- `Rooms/` — office/minigame room images (legacy 2.1.5 previews; the 2.2 room
+  exporter needs the UMT GUI renderer and is a manual step)
 
-The full ~1 GB dump stays on your PC. To refresh this curated slice after a new
-decompile/export, run:
+The full ~1 GB dump stays on your PC. To regenerate the source exports with
+UndertaleModTool CLI 0.9.2.0 and then refresh this curated slice, run:
+
+```powershell
+.\Scripts\export-port-assets.ps1
+```
+
+If the exports already exist, just refresh the curated copy:
 
 ```powershell
 .\Scripts\import-port-assets.ps1
 ```
 
 The current IPA bundles the full web loader, so it works offline. These assets
-are the foundation for the true native port.
+are the foundation for the true native 2.2 port; they do not change the shipped
+web build's version.
 
 ---
 

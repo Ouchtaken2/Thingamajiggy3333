@@ -2,12 +2,15 @@
   "schemaVersion": 1,
   "displayName": "Frickbears 3 native port asset index",
   "source": {
-    "build": "Four Layers Down 2.1.5",
-    "gameDirectory": "../frickbears3-4ld-v2.1.5",
-    "codeDirectory": "../frickbears3-4ld-v2.1.5/Export_Code",
+    "build": "Four Layers Down 2.2.2 (official 2.2)",
+    "shippedWebBuild": "Four Layers Down 2.1.5",
+    "gameDirectory": "../frickbears3-4ld-v2.2.2",
+    "codeDirectory": "../frickbears3-4ld-v2.2.2/Export_Code",
     "codeReferenceDirectory": "Code/Reference",
-    "assemblyDirectory": "../frickbears3-4ld-v2.1.5/Open AI stuff",
-    "textureGroupsGlob": "../frickbears3-4ld-v2.1.5/texgroup_*"
+    "vanillaCodeDirectory": "Code/Vanilla-2.2.2",
+    "assemblyDirectory": "../frickbears3-4ld-v2.2.2/Open AI stuff",
+    "textureGroupsGlob": "../frickbears3-4ld-v2.2.2/texgroup_*",
+    "roomsNote": "Room previews are legacy 2.1.5 exports; GUI-only 2.2 refresh pending"
   },
   "rooms": {
     "office": "Rooms/Office.png",
@@ -25,8 +28,8 @@
       "tileSize": 16,
       "mines": 10,
       "code": {
-        "create": "../Export_Code/gml_Object_oMinigame_FreddyFazsweep_Create_0.gml",
-        "draw": "../Export_Code/gml_Object_oMinigame_FreddyFazsweep_Draw_0.gml"
+        "create": "Code/Vanilla-2.2.2/gml_Object_oMinigame_FreddyFazsweep_Create_0.gml",
+        "draw": "Code/Vanilla-2.2.2/gml_Object_oMinigame_FreddyFazsweep_Draw_0.gml"
       },
       "spriteSets": [
         {
@@ -78,8 +81,8 @@
       "tileSize": 8,
       "mines": 60,
       "code": {
-        "create": "../Export_Code/gml_Object_oMinigame_GoldenFazsweep_Create_0.gml",
-        "draw": "../Export_Code/gml_Object_oMinigame_GoldenFazsweep_Draw_0.gml"
+        "create": "Code/Vanilla-2.2.2/gml_Object_oMinigame_GoldenFazsweep_Create_0.gml",
+        "draw": "Code/Vanilla-2.2.2/gml_Object_oMinigame_GoldenFazsweep_Draw_0.gml"
       },
       "spriteSets": [
         {
